@@ -14,14 +14,16 @@ do rs.%Next()
 set count = rs.%Get("cnt")
 
 set msg = "Have you submitted an order for 100 units?" 
-do:count<101 ##class(%zInstruqt.Check).AddError(.errors, msg)
+do:count<99 ##class(%zInstruqt.Check).AddError(.errors, msg)
 
 
-msg = "Have you got the correct answer in the Quiz?"
-set out = ^HoleFoodsQuiz
-do:'out ##class(%zInstruqt.Check).AddError(.errors, msg)
+set msg = "Have you got the correct answer in the Quiz?"
+
+do:'^HoleFoodsQuiz ##class(%zInstruqt.Check).AddError(.errors, msg)
 do ##class(%zInstruqt.Check).Failure(.errors)
-EOCOS
+halt
+EOF
+EOSU
 
 EXIT=$?
 

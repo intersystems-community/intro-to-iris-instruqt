@@ -1,0 +1,4 @@
+#!/bin/bash
+
+exec > >(tee /tmp/solve-challenge-4.log) 2>&1
+set -euxo pipefail

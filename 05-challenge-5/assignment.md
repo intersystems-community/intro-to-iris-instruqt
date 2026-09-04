@@ -7,9 +7,9 @@ notes:
 - type: text
   contents: |
     # Real Time Insight
-    InterSystems IRIS includes a powerful built-in business intelligence engine, allowing you to visualize data and generate insights directly from the source.
+    InterSystems IRIS includes a powerful built-in business intelligence (BI) engine, allowing you to visualize data and generate insights directly from the source.
 
-    Because analysis happens in-place, insights are available in real time, with no need to move or duplicate data. This enables faster decisions and eliminates delays typically introduced by separate analytics pipelines.
+    Because analysis happens in place, insights are available in real time, with no need to move or duplicate data. This enables faster decisions and eliminates delays typically introduced by separate analytics pipelines.
 
     InterSystems IRIS also integrates seamlessly with external BI tools such as Power BI and Tableau, giving you the flexibility to present your data using your favorite tools.
 tabs:
@@ -35,34 +35,38 @@ difficulty: ""
 enhanced_loading: null
 ---
 # A live dashboard
-Welcome to an InterSystems IRIS BI dashboard. The charts and tables provide a look at our shops' sales. These are all based on queries against our dataset which have been configured to run every 10s.
+Welcome to an InterSystems IRIS Business Intelligence dashboard. The charts and tables provide a look at our shops' sales. These are all based on queries against our dataset which have been configured to run every 10 seconds.
 
 Let's see this in action. **Make a note of the current top product, and how the weekly revenue is looking.**
 
-**Now let's return to our [Shop tab](tab-1) and submit another order**. How about 100 units of Gummy Rings; that should make a pretty visible dent in our weekly revenue!
+**Now let's return to our [Shop](tab-1) tab and submit another order**. How about 100 units of Gummy Rings? That should make a pretty visible dent in our revenue stats!
 
-**Submit the order and return to the Analytics dashboard.** You should see our Gummy rings move up the leaderboard of top products.
+**Submit the order and return to the Analytics dashboard in the [IRIS](tab-0) tab.** You might need to wait a couple of seconds before the next refresh, but you should see our Gummy Rings move up the leaderboard of top products.
 
 This demonstrates an important capability of InterSystems IRIS: transactions and analytics can operate on the same data platform. The order is written to InterSystems IRIS and is then immediately available to applications and SQL queries. For this dashboard, there is no separate export, reporting database, or scheduled operation between placing the order and analyzing it.
 
 # Complex data models
 
-Direct SQL is useful when we want fast access to operational data or already know the questions that the application needs to answer. However, InterSystems IRIS also supports richer analytical models through InterSystems IRIS Business Intelligence. IRIS BI models organise data into reusable measures and dimensions. For example, sales could be analyzed by product, shop, customer or time period, while measures could include revenue, order quantity and average order value. Users can then apply filters, create pivot tables, and drill from a high-level total into the records behind it.
+Direct SQL is useful when we want fast access to operational data or already know the questions that the application needs to answer. However, InterSystems IRIS also supports richer analytical models through InterSystems IRIS Business Intelligence. IRIS BI models organize data into reusable measures and dimensions. For example, sales could be analyzed by product, shop, customer or time period, while measures could include revenue, order quantity and average order value. Users can then apply filters, create pivot tables, and drill from a high-level total into the records behind it.
 
-Let's take a look at our second dashboard. **Click the "HoleFoods" link at the top of the page to see our other Dashboards, then open the Exploratory Dashboard.**
+Let's take a look at our second dashboard. **Click the HoleFoods link at the top of the page to see our other dashboards, then open the Exploratory Dashboard.**
 ![The HoleFoods link at the top of the dashboard page for navigating to other dashboards](..\assets\HoleFoodsButtonHint.png)
 
-This dashboard example is built upon analytics Cubes and Pivot tables, which means the data is not updated instantly — the cube needs to be rebuilt first. It does, however, allow more complex data models to be built. Let's see this in action.
+This dashboard example is built upon analytics cubes and pivot tables, which means the data is not updated instantly — the cube needs to be rebuilt (or synchronized) first. It does, however, allow more complex data models to be built. Let's see this in action.
 
-Our top chart is a chart of Sale by Region.
+Our top chart is a chart of Sales by Region.
 
-**Click on any of the Continent labels below the bars.**
+**Click any of the Continent labels below the bars.**
 
-You should see the chart drill down into the countries of that region. Repeat this by clicking on one of the country labels. You will now see the Sales by City. Pretty neat, right?
+You should see the chart drill down into the countries of that region.
 
-**Click the Back button (above the chart) twice to return to the regional view.**
+**Repeat this by clicking on one of the country labels.**
 
-Let's also filter by Category from the menu in the far right of the Screen:
+You will now see the Sales by City. Pretty neat, right?
+
+**Click the Back button above the chart twice to return to the regional view.**
+
+Let's also filter by category from the menu in the far right of the screen:
 
 ![The Category filter menu on the right side of the Exploratory Dashboard](..\assets\CategoryFilter.png)
 
@@ -70,16 +74,16 @@ Let's also filter by Category from the menu in the far right of the Screen:
 
 # Challenge
 
-Now we're going to make this into a challenge!
+Now it's time for a challenge!
 
-Your task is to work out **how many units of Pasta were sold in Rome, Italy (Europe)**.
+Your task is to work out *how many units of pasta were sold in Rome, Italy (Europe)*.
 
 
-When you think you have the right answer, **switch to the [Quiz tab](tab-2) to see if you are right!**
+When you think you have the right answer, **switch to the [Quiz](tab-2) tab to see if you are right!**
 
-# Conclusions
+# Summary
 
-Let's recap. Here we have seen how IRIS BI has built in analytics tools to explore and visualize data. These tools can allow quick access to Key Performance Indicators through SQL, or more sophisticated analysis through user-defined analytical data models.
+Let's recap. Here we have seen how InterSystems IRIS Business Intelligence has built in analytics tools to explore and visualize data. These tools can allow quick access to Key Performance Indicators through SQL, or more sophisticated analysis through user-defined analytical data models.
 
-And if you'd prefer to use the tools you know? You can always connect external tools to InterSystems IRIS as well.
+Prefer to use the tools you know? You can also connect external tools to InterSystems IRIS at any time.
 

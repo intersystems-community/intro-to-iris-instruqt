@@ -62,6 +62,8 @@ set sc = ##class(%DeepSee.Utils).%SynchronizeCube("HoleFoodsSales", 1, .facts)
 zpm "install MDX2JSON"
 zpm "install dsw"
 
+set ^HoleFoodsQuiz = 0
+
 halt
 EOSQL
 

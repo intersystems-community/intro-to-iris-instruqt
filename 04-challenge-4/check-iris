@@ -9,13 +9,11 @@ su - irisowner <<'EOSU'
 cat <<'EOF' | iris session iris -UUSER
 kill errors
 set sql = "SELECT ID FROM HoleFoods.SalesTransaction WHERE Product->SKU='SKU-976'"
-set msg = "Have you submit an Order using the web form?" 
+set msg = "Have you submitted an Order using the web form?" 
 
 do ##class(%zInstruqt.CheckExtras).CheckSQLReturnsResults(sql,msg,.errors)
-do ##class(%zInstruqt.Check).Failure(.errors)
 
 do ##class(%zInstruqt.CheckExtras).CheckComponentFunctioning("ToEmail", .errors)
-do ##class(%zInstruqt.Check).Failure(.errors)
 
 set sql = "SELECT ID FROM Ens_Util.Log WHERE ConfigName = 'ToEmail' and SourceMethod='SendMail'"
 set msg = "Have you re-submitted an order with the ToEmail functioning?"
@@ -23,7 +21,8 @@ do ##class(%zInstruqt.CheckExtras).CheckSQLReturnsResults(sql,msg,.errors)
 
 do ##class(%zInstruqt.Check).Failure(.errors)
 halt
-EOCOS
+EOF
+EOSU
 
 EXIT=$?
 

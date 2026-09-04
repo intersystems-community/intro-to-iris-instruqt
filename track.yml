@@ -1,14 +1,16 @@
 slug: intro-to-iris
 id: nc1fzutwzscb
-title: Intro To IRIS
+title: 'InterSystems IRIS: A First Look'
 description: ""
 icon: ""
 tags: []
 owner: intersystems
 developers:
 - gubsing@hotmail.com
+show_timer: true
+skipping_enabled: true
 idle_timeout: 300
-timelimit: 2400
+timelimit: 3600
 sandbox_preset: iris-data-platform
 lab_config:
   sidebar_enabled: true
@@ -26,11 +28,11 @@ lab_config:
   - Restful services standing by...
   - Rolling out a fresh namespace...
   - Buffering that embedded SQL...
-  - Syncing with the multimodel database...
+  - Syncing with the multi-model database...
   - Polishing the REST API...
   - Preparing the analytics engine...
   - Greasing the business service...
   - Warming up interoperability routing...
-  hideStopButton: false
-checksum: "841199959900346804"
+  hideStopButton: true
+checksum: "9374943102657479759"
 enhanced_loading: false
