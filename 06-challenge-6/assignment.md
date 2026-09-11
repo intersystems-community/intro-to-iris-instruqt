@@ -47,4 +47,4 @@ For more hands-on tutorials and quickstart guides for key topics, visit the [Int
 
 To discuss, ask questions, and learn from developers who are using InterSystems products, be sure to join us at the [Developer Community](https://community.intersystems.com).
 
-To see some great example applications, check out the [Open Exchange](https://openexchange.intersystems.com/), or find the code used throughout this tutorial on [GitHub](https://github.com/isc-ging/intro-to-iris-instruqt).
+To see some great example applications, check out the [Open Exchange](https://openexchange.intersystems.com/), or find the code used throughout this tutorial on [GitHub](https://github.com/intersystems-community/intro-to-iris-instruqt).
