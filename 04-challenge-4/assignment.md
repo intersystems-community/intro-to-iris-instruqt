@@ -23,7 +23,7 @@ tabs:
   title: IRIS
   type: service
   hostname: iris
-  path: /ui/interop/redirect.html
+  path: /ui/interop/interop-editor/index.html?$NAMESPACE=USER&$PRODUCTION=HoleFoods.Interop.Production
   port: 52773
   protocol: http
 - id: myvbqfctfiz9
