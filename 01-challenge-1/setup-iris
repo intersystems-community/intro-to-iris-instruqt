@@ -9,10 +9,9 @@ exec > >(tee /tmp/setup-challenge-1.log) 2>&1
 ## else is activated Locally
 ## This ensures the same container setup is created for both. it works fine for both
 if [ ! -d "/home/irisowner/intro-to-iris-instruqt" ]; then
-	apt-get update && apt-get install -y curl git
-	cd /home/irisowner
-	ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
-	git clone https://www.github.com/isc-ging/intro-to-iris-instruqt
+	python3 -c "import urllib.request; urllib.request.urlretrieve('https://github.com/intersystems-community/intro-to-iris-instruqt/archive/refs/heads/main.tar.gz', '/tmp/repo.tar.gz')"
+	tar -xzf /tmp/repo.tar.gz -C /home/irisowner/
+	mv /home/irisowner/intro-to-iris-instruqt-main /home/irisowner/intro-to-iris-instruqt
 
 else 
   /home/irisowner/intro-to-iris-instruqt/sandbox-setup.sh
