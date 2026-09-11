@@ -1,0 +1,84 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+exec > >(tee /tmp/setup-challenge-4.log) 2>&1
+
+su - irisowner <<'EOSU'
+
+iris session IRIS -U USER <<'EOF'
+write "Loading interop classes...",!
+set tSC = $system.OBJ.Import("/home/irisowner/intro-to-iris-instruqt/src/HoleFoods", "cuk")
+if 'tSC { do $system.Status.DisplayError(tSC) halt }
+
+write "Running setup...",!
+set tSC = ##class(HoleFoods.Interop.Setup).Run()
+if 'tSC { do $system.Status.DisplayError(tSC) halt }
+
+write "Challenge 4 setup complete.",!
+halt
+EOF
+
+EOSU
+
+# Copy web pages to CSP directory
+cp /home/irisowner/intro-to-iris-instruqt/src/order.html          /usr/irissys/csp/user/order.html
+cp /home/irisowner/intro-to-iris-instruqt/src/thankyou.html       /usr/irissys/csp/user/thankyou.html
+cp /home/irisowner/intro-to-iris-instruqt/src/thankyou-noemail.html /usr/irissys/csp/user/thankyou-noemail.html
+cp /home/irisowner/intro-to-iris-instruqt/src/quiz.html     /usr/irissys/csp/user/quiz.html
+
+# Pre-warm shim for the Angular interop editor. Served at /ui/interop/redirect.html;
+# the challenge-4 IRIS tab points here so the production is warm before the editor
+# loads, avoiding the first-load blank page that otherwise needs a manual refresh.
+cat <<'EOF' > /usr/irissys/ui/interop/redirect.html
+<!DOCTYPE html>
+<html>
+<body>
+<script>
+// Pre-warm shim for the Angular interop editor.
+//
+// On a cold Instruqt sandbox the editor loses a race on first load: it reads the
+// production's `.name` before its async production fetch has resolved, throws a
+// TypeError, and shows a blank page until the user manually refreshes.
+//
+// We close the race by hitting the production endpoint ourselves first. Once it
+// answers 200 the production is compiled and warm in IRIS, so when we hand off
+// to the Angular app its own fetch resolves immediately and the read succeeds.
+// A ready production returns 200; while IRIS is still warming it returns 404
+// ("...does not exist"), so 200 is the readiness signal we wait for.
+//
+// The login call establishes the session cookie the editor reuses (mirrors what
+// the app itself does on load).
+
+var NAMESPACE = 'USER';
+var PRODUCTION = 'HoleFoods.Interop.Production';
+var EDITOR_URL = '/ui/interop/interop-editor/index.html'
+  + '?%24NAMESPACE=' + NAMESPACE + '&%24PRODUCTION=' + PRODUCTION;
+var PRODUCTION_URL = '/api/interop-editors/v6/' + NAMESPACE
+  + '/productions/' + PRODUCTION;
+
+var MAX_ATTEMPTS = 30;   // ~30s ceiling for a cold instance
+var RETRY_MS = 1000;
+
+function go() { window.location.replace(EDITOR_URL); }
+
+function warm(attempt) {
+  fetch(PRODUCTION_URL, { credentials: 'include' }).then(function (resp) {
+    if (resp.ok) { go(); return; }
+    if (attempt >= MAX_ATTEMPTS) { go(); return; }  // hand off anyway; user can refresh
+    setTimeout(function () { warm(attempt + 1); }, RETRY_MS);
+  });
+}
+
+fetch('/api/interop-editors/login', {
+  method: 'POST',
+  credentials: 'include',
+  headers: {
+    'Authorization': 'Basic ' + btoa('SuperUser:SYS'),
+    'Content-Type': 'application/json'
+  }
+}).then(function () { warm(1); });
+</script>
+</body>
+</html>
+EOF

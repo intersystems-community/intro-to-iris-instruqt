@@ -1,0 +1,30 @@
+#!/bin/bash
+
+exec > >(tee /tmp/check-challenge-5.log) 2>&1
+set -uxo pipefail
+
+
+
+su - irisowner <<'EOSU'
+cat <<'EOF' | iris session iris -UUSER
+kill errors
+set sql = "SELECT SUM(UnitsSold) as cnt FROM HoleFoods.SalesTransaction WHERE Product->SKU='SKU-976'"
+set rs = ##class(%SQL.Statement).%ExecDirect(,sql)
+do rs.%Next()
+set count = rs.%Get("cnt")
+
+set msg = "Have you submitted an order for 100 units?" 
+do:count<99 ##class(%zInstruqt.Check).AddError(.errors, msg)
+
+
+set msg = "Have you got the correct answer in the Quiz?"
+
+do:'^HoleFoodsQuiz ##class(%zInstruqt.Check).AddError(.errors, msg)
+do ##class(%zInstruqt.Check).Failure(.errors)
+halt
+EOF
+EOSU
+
+EXIT=$?
+
+exit $EXIT
