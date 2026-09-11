@@ -27,58 +27,266 @@ cp /home/irisowner/intro-to-iris-instruqt/src/thankyou.html       /usr/irissys/c
 cp /home/irisowner/intro-to-iris-instruqt/src/thankyou-noemail.html /usr/irissys/csp/user/thankyou-noemail.html
 cp /home/irisowner/intro-to-iris-instruqt/src/quiz.html     /usr/irissys/csp/user/quiz.html
 
-# Pre-warm shim for the Angular interop editor. Served at /ui/interop/redirect.html;
-# the challenge-4 IRIS tab points here so the production is warm before the editor
-# loads, avoiding the first-load blank page that otherwise needs a manual refresh.
-cat <<'EOF' > /usr/irissys/ui/interop/redirect.html
-<!DOCTYPE html>
-<html>
-<body>
-<script>
-// Pre-warm shim for the Angular interop editor.
-//
-// On a cold Instruqt sandbox the editor loses a race on first load: it reads the
-// production's `.name` before its async production fetch has resolved, throws a
-// TypeError, and shows a blank page until the user manually refreshes.
-//
-// We close the race by hitting the production endpoint ourselves first. Once it
-// answers 200 the production is compiled and warm in IRIS, so when we hand off
-// to the Angular app its own fetch resolves immediately and the read succeeds.
-// A ready production returns 200; while IRIS is still warming it returns 404
-// ("...does not exist"), so 200 is the readiness signal we wait for.
-//
-// The login call establishes the session cookie the editor reuses (mirrors what
-// the app itself does on load).
+# Fix for the Angular interop editor's IRIS tab rendering blank on first load.
+# Root cause: a division-by-zero in the editor's grid ResizeObserver callback.
+# Instruqt creates every challenge tab's iframe at page load and hides inactive
+# ones via `display: none`, so a hidden editor's ResizeObserver can fire with a
+# 0x0 contentRect, which commits `width: 0px; height: 0px` onto every grid cell
+# and caches a zero root width. The next real-size callback then divides by that
+# cached zero (Infinity), multiplies into NaN, and the browser discards the
+# invalid `NaNpx` assignment -- leaving the stale zeros in place permanently.
+# Only a fresh document load (e.g. Instruqt's "Refresh tab" button) re-seeds the
+# cache from a non-zero container, which is why refreshing "fixes" it.
+#
+# Patched in place here, before the tab is ever opened, so the bug never
+# occurs. See BUG-interop-tab-blank.md for the full investigation.
+EDITOR_DIR=${EDITOR_DIR:-/usr/irissys/ui/interop/interop-editor}
+BUNDLE=${BUNDLE:-$EDITOR_DIR/main.6c2b174f21f45c92.js}
 
-var NAMESPACE = 'USER';
-var PRODUCTION = 'HoleFoods.Interop.Production';
-var EDITOR_URL = '/ui/interop/interop-editor/index.html'
-  + '?%24NAMESPACE=' + NAMESPACE + '&%24PRODUCTION=' + PRODUCTION;
-var PRODUCTION_URL = '/api/interop-editors/v6/' + NAMESPACE
-  + '/productions/' + PRODUCTION;
+python3 - "$BUNDLE" <<'PYEOF'
+import shutil
+import sys
 
-var MAX_ATTEMPTS = 30;   // ~30s ceiling for a cold instance
-var RETRY_MS = 1000;
+bundle = sys.argv[1]
+backup = bundle + '.orig'
 
-function go() { window.location.replace(EDITOR_URL); }
+MARKER = 'INTEROP_ZERO_SIZE_GUARD'
 
-function warm(attempt) {
-  fetch(PRODUCTION_URL, { credentials: 'include' }).then(function (resp) {
-    if (resp.ok) { go(); return; }
-    if (attempt >= MAX_ATTEMPTS) { go(); return; }  // hand off anyway; user can refresh
-    setTimeout(function () { warm(attempt + 1); }, RETRY_MS);
-  });
+ORIGINAL = (
+    'new window.ResizeObserver(n=>{'
+    'const r=n[0].contentRect;'
+    'this.grid.scale(r.width/this.grid.width,r.height/this.grid.height)'
+    '}).observe(this.grid.cellEl)'
+)
+
+PATCHED = (
+    'new window.ResizeObserver(n=>{'
+    '/*' + MARKER + '*/'
+    'const r=n[0].contentRect;'
+    # Guard 1: a zero-sized notification means we are hidden. Scaling by 0 would
+    # commit width:0px/height:0px to every cell and cache a zero root width.
+    'if(0===r.width||0===r.height){return}'
+    # Guard 2: cached dimensions are already zero, so dividing by them yields
+    # Infinity and then 0*Infinity=NaN, which the browser discards -- leaving the
+    # stale zeros in place. Rebuild from the declared initialSize values instead.
+    'if(0===this.grid.width||0===this.grid.height){this.grid.initializeStyles();return}'
+    'this.grid.scale(r.width/this.grid.width,r.height/this.grid.height)'
+    '}).observe(this.grid.cellEl)'
+)
+
+with open(bundle, 'r', encoding='utf-8') as f:
+    src = f.read()
+
+if MARKER in src:
+    print('Already patched (%s present); nothing to do.' % MARKER)
+    sys.exit(0)
+
+# First run: keep a pristine copy so a re-patch never stacks on a patched file.
+try:
+    with open(backup, 'r', encoding='utf-8'):
+        pass
+    print('Restoring pristine bundle from %s' % backup)
+    shutil.copyfile(backup, bundle)
+    with open(bundle, 'r', encoding='utf-8') as f:
+        src = f.read()
+except FileNotFoundError:
+    shutil.copyfile(bundle, backup)
+    print('Backed up pristine bundle to %s' % backup)
+
+count = src.count(ORIGINAL)
+if count != 1:
+    raise SystemExit(
+        'ERROR: expected exactly 1 occurrence of the ResizeObserver callback, '
+        'found %d. The bundle has changed -- re-derive the patch target by '
+        'grepping for "ResizeObserver" in %s before trusting this script.'
+        % (count, bundle)
+    )
+
+with open(bundle, 'w', encoding='utf-8') as f:
+    f.write(src.replace(ORIGINAL, PATCHED))
+
+print('Patched zero-size guard into %s' % bundle)
+PYEOF
+
+# Narrow-viewport fix for the IRIS interop-editor Angular app so the
+# Production Configuration UI stays usable when the browser is squeezed by
+# the Instruqt sandbox side panel (~700px wide).
+#
+# CSS part: appends an override block rather than editing the minified rules
+# in place. Guarded on its own marker so a re-run does not stack duplicate
+# copies of the block.
+#
+# JS part: the Inbound/Process/Outbound diagram is drawn as two overlapping
+# layers inside app-production-config-canvas: a <canvas> (connector lines)
+# and a sibling .text-layer of absolutely-positioned <div>s (the actual
+# host boxes/labels/icons). Both live inside .container, which Angular
+# sizes to the diagram's content, not the viewport. The fix narrows each
+# host box's own `left`/`width` (and the label div's inline `width`) by a
+# shrink factor, WITHOUT touching font-size, so wrapped text stays legible.
+# A ResizeObserver + MutationObserver re-run the layout whenever the outer
+# container is resized or Angular redraws the diagram at a new content size.
+INTEROP_CSS_FILE="/usr/irissys/ui/interop/interop-editor/styles.c6b7d33b3ab6ef35.css"
+INTEROP_HTML_FILE="/usr/irissys/ui/interop/interop-editor/index.html"
+
+if grep -q "Instruqt narrow-viewport override" "$INTEROP_CSS_FILE"; then
+  echo "CSS override block already present in ${INTEROP_CSS_FILE}, skipping."
+else
+cat <<'EOF' >> "$INTEROP_CSS_FILE"
+
+/* --- Instruqt narrow-viewport override (added for sandbox side-panel layout) --- */
+
+/* Safe at any width: these only remove artificial minimums and let the toolbar
+   rows wrap instead of overflowing. */
+.headers{min-width:0!important}
+.toolBar{height:auto!important;flex-wrap:wrap!important}
+.fullHeader{flex-wrap:wrap!important}
+.mat-mdc-form-field-infix{width:auto!important;min-width:0!important}
+.productionsCanvas .fr-grid-cell-content{overflow-x:auto!important;overflow-y:hidden!important}
+
+/* Shrink rules -- ONLY below 720px.
+   These force each .toolBarButton to 38px, but the labels ("Show Only
+   Connected", "Connection Options", "Stop Production") still render 46-48px
+   wide and overflow their 38px box, so at normal widths adjacent buttons and
+   their labels visibly overlap. The editor's own sizing (65px buttons, 61px
+   labels) fits fine whenever there is room, so only apply the squeeze when
+   there genuinely is not. */
+@media (max-width: 720px) {
+  .dashboard{font-size:11px!important}
+  .navbuttons{margin:3px!important}
+  .buttonTab{padding:0 3px!important}
+  .navbuttonText{padding-left:3px!important;padding-right:3px!important}
+  .toolBarButton{width:38px!important;height:44px!important;padding:2px!important}
+  .buttonLabel{font-size:9px!important}
+  mat-form-field.filtertext{width:90px!important}
+  .filterHostsInput{width:140px!important}
 }
-
-fetch('/api/interop-editors/login', {
-  method: 'POST',
-  credentials: 'include',
-  headers: {
-    'Authorization': 'Basic ' + btoa('SuperUser:SYS'),
-    'Content-Type': 'application/json'
-  }
-}).then(function () { warm(1); });
-</script>
-</body>
-</html>
 EOF
+fi
+
+if grep -q instruqtFitAttached "$INTEROP_HTML_FILE"; then
+  echo "Canvas-fit script already present in ${INTEROP_HTML_FILE}, skipping."
+else
+  python3 - "$INTEROP_HTML_FILE" <<'PYEOF'
+import sys
+
+html_file = sys.argv[1]
+snippet = '''<script>
+(function () {
+  function fit(diagram) {
+    var outer = diagram.closest('.productionsCanvas .fr-grid-cell-content');
+    var textLayer = diagram.querySelector('.text-layer');
+    if (!outer || !textLayer) return;
+    var boxes = Array.prototype.slice.call(textLayer.children);
+    boxes.forEach(function (b) {
+      if (b.dataset.instruqtOrigLeft === undefined) {
+        b.dataset.instruqtOrigLeft = parseFloat(b.style.left) || 0;
+        b.dataset.instruqtOrigWidth = parseFloat(b.style.width) || 0;
+        var label = Array.prototype.slice.call(b.children)
+          .filter(function (c) { return c.style.marginLeft; })[0];
+        if (label) {
+          b.dataset.instruqtLabelOrigWidth = parseFloat(label.style.width) || 0;
+        }
+      }
+    });
+    var maxRight = 0;
+    boxes.forEach(function (b) {
+      var left = parseFloat(b.dataset.instruqtOrigLeft);
+      var width = parseFloat(b.dataset.instruqtOrigWidth);
+      maxRight = Math.max(maxRight, left + width);
+    });
+    if (!maxRight) return;
+    var factor = Math.min(1, (outer.clientWidth * 0.93) / maxRight);
+    boxes.forEach(function (b) {
+      var left = parseFloat(b.dataset.instruqtOrigLeft);
+      var width = parseFloat(b.dataset.instruqtOrigWidth);
+      b.style.left = (left * factor) + 'px';
+      b.style.width = (width * factor) + 'px';
+      b.style.maxWidth = (width * factor) + 'px';
+      var label = Array.prototype.slice.call(b.children)
+        .filter(function (c) { return c.style.marginLeft; })[0];
+      if (label && b.dataset.instruqtLabelOrigWidth !== undefined) {
+        label.style.width = (parseFloat(b.dataset.instruqtLabelOrigWidth) * factor) + 'px';
+      }
+    });
+  }
+  // The side panel that opens on Create (or on clicking a host) is a grid cell
+  // whose width the editor computes from findRemainingSize(), which reads
+  // contentEl.offsetWidth. If the panel is created after the Instruqt tab has
+  // been hidden and relaid out, that read comes back ~0, so the new cell latches
+  // an inline `width: 1px` inside a 400px parent and the panel renders blank.
+  // Nothing recovers it -- only closing and reopening the panel, because that
+  // builds a fresh cell against a real container width.
+  //
+  // Heal it: an inline width under 8px inside a much wider .fr-grid-cell-content
+  // is never a legitimate layout, so stretch it to fill. Only do this when the
+  // content box stacks its children in a column, where width is meant to be the
+  // full container rather than one share of a row (same logic transposed for
+  // height in a row-direction parent).
+  var DEGENERATE = 8;
+  function healCell(cell) {
+    var outer = cell.parentElement && cell.parentElement.closest('.fr-grid-cell-content');
+    if (!outer) return;
+    var dir = getComputedStyle(outer).flexDirection;
+    var w = parseFloat(cell.style.width);
+    var h = parseFloat(cell.style.height);
+    if (dir === 'column' && w > 0 && w < DEGENERATE && outer.clientWidth > DEGENERATE) {
+      cell.style.width = '100%';
+    }
+    if (dir === 'row' && h > 0 && h < DEGENERATE && outer.clientHeight > DEGENERATE) {
+      cell.style.height = '100%';
+    }
+  }
+  function healAllCells() {
+    var cells = document.querySelectorAll('.fr-grid-cell');
+    for (var i = 0; i < cells.length; i++) healCell(cells[i]);
+  }
+  // Setting style.width re-triggers the observer, so coalesce to one pass per
+  // frame. This terminates: a healed cell reads back as 100, which is above the
+  // threshold, so the next pass leaves it alone.
+  var healQueued = false;
+  function queueHeal() {
+    if (healQueued) return;
+    healQueued = true;
+    requestAnimationFrame(function () { healQueued = false; healAllCells(); });
+  }
+  new MutationObserver(queueHeal).observe(document.documentElement, {
+    childList: true, subtree: true, attributes: true, attributeFilter: ['style']
+  });
+  queueHeal();
+
+  function findDiagram() {
+    return document.querySelector('app-production-config-canvas .container');
+  }
+  function attach(diagram) {
+    if (diagram.dataset.instruqtFitAttached) return;
+    diagram.dataset.instruqtFitAttached = '1';
+    fit(diagram);
+    var outer = diagram.closest('.productionsCanvas .fr-grid-cell-content');
+    if (outer) {
+      new ResizeObserver(function () { fit(diagram); }).observe(outer);
+    }
+    new MutationObserver(function () { fit(diagram); })
+      .observe(diagram, { childList: true, subtree: true });
+  }
+  var root = new MutationObserver(function () {
+    var diagram = findDiagram();
+    if (diagram) attach(diagram);
+  });
+  root.observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('DOMContentLoaded', function () {
+    var diagram = findDiagram();
+    if (diagram) attach(diagram);
+  });
+})();
+</script>
+'''
+
+with open(html_file) as f:
+    html = f.read()
+html = html.replace('</body>', snippet + '</body>')
+with open(html_file, 'w') as f:
+    f.write(html)
+PYEOF
+fi
+
+echo "Interop editor narrow-viewport fix applied."
