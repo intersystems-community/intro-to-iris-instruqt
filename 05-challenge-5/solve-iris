@@ -1,4 +1,45 @@
 #!/bin/bash
 
-exec > >(tee /tmp/solve-challenge-4.log) 2>&1
+exec > >(tee /tmp/solve-challenge-5.log) 2>&1
 set -euxo pipefail
+
+# Learner path: order 100 Gummy Rings in the Shop tab, then answer the Quiz tab.
+# Both calls are the same REST endpoints the web pages use. Fails loudly on any problem.
+python3 - <<'PYEOF'
+import json
+import urllib.request
+
+base = "http://localhost:52773/api/holeFoods"
+
+
+def post_json(path, body):
+    request = urllib.request.Request(
+        base + path,
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request) as resp:
+        return json.load(resp)
+
+
+with urllib.request.urlopen(base + "/outlets") as resp:
+    first_outlet = json.load(resp)[0]
+
+order_result = post_json("/order", {
+    "SKU": "SKU-976",
+    "Quantity": 100,
+    "Email": "customer@example.com",
+    "City": first_outlet["city"],
+    "OutletId": first_outlet["id"],
+})
+print("Order response:", order_result)
+if order_result["status"] != "success":
+    raise SystemExit("Order failed: %s" % order_result)
+
+# The quiz answer is 42 units of pasta in Rome (see assignment.md).
+quiz_result = post_json("/quizcheck", {"answer": 42})
+print("Quiz response:", quiz_result)
+if quiz_result["correct"] is not True:
+    raise SystemExit("Quiz answer rejected: %s" % quiz_result)
+PYEOF
