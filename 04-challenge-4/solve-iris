@@ -87,7 +87,8 @@ with urllib.request.urlopen(request) as resp:
 print("Order response:", result)
 if result["status"] != "success":
     raise SystemExit("Order failed: %s" % result)
-if result["emailSent"] is not True:
+# OrderDispatch.PlaceOrder writes emailSent as the number 1 or 0, not a JSON boolean.
+if result["emailSent"] != 1:
     raise SystemExit("Order placed but ToEmail did not send: %s" % result)
 PYEOF
 
